@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  api:
+    image: vikunja/api
+    restart: unless-stopped
+    environment:
+      VIKUNJA_DATABASE_HOST: postgresql-primary
+      VIKUNJA_DATABASE_PASSWORD: $VIKUNJA_DATABASE_PASSWORD
+      VIKUNJA_DATABASE_TYPE: postgres
+      VIKUNJA_DATABASE_USER: vikunja
+      VIKUNJA_DATABASE_DATABASE: vikunja
+      VIKUNJA_MAILER_ENABLED: "true"
+      VIKUNJA_MAILER_HOST: email-smtp.us-east-2.amazonaws.com
+      VIKUNJA_MAILER_PORT: 587
+      VIKUNJA_MAILER_USERNAME: $VIKUNJA_MAILER_USERNAME
+      VIKUNJA_MAILER_PASSWORD: $VIKUNJA_MAILER_PASSWORD
+      VIKUNJA_MAILER_FROMEMAIL: vikunja@argonaut.network
+      VIKUNJA_BACKGROUNDS_ENABLED: "false"
+      VIKUNJA_SERVICE_TIMEZONE: America/New_York
+      VIKUNJA_SERVICE_FRONTENDURL: "https://vikunja.argonaut.network"
+      VIKUNJA_SERVICE_ENABLEREGISTRATION: "false"
+      VIKUNJA_SERVICE_JWT_SECRET: $VIKUNJA_SERVICE_JWT_SECRET
+      VIKUNJA_AUTH_LOCAL_ENABLED: "false"
+      # Leave deactivated unless strictly necessary
+      #VIKUNJA_LOG_LEVEL: DEBUG
+      
+    volumes: 
+      - /var/lib/vikunja/files:/app/vikunja/files
+      - /etc/vikunja:/etc/vikunja:ro
+    networks:
+      - proxy
+      - postgresql-primary-backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja-api.rule=HostHeader(`vikunja.argonaut.network`) && PathPrefix(`/api/v1`, `/dav/`, `/.well-known/`)"
+      - "traefik.http.routers.vikunja-api.rule=Host(`vikunja.argonaut.network`) && PathPrefix(`/api/v1`, `/dav/`, `/.well-known/`)"
+      - "traefik.http.routers.vikunja-api.entrypoints=https"
+      - "traefik.http.routers.vikunja-api.tls=true"
+      
+      # Attach this container to the reverse proxy network.
+      - "traefik.docker.network=proxy"
+      
+      # Enable automatic updates with Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  frontend:
+    image: vikunja/frontend
+    restart: unless-stopped
+    #environment:
+      #VIKUNJA_API_URL: "http://vikunja.argonaut.network:3456/api/v1"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vikunja-secure.entrypoints=https"
+      - "traefik.http.routers.vikunja-secure.rule=Host(`vikunja.argonaut.network`)"
+      - "traefik.http.routers.vikunja-secure.tls=true"
+      
+      # Attach this container to the reverse proxy network.
+      - "traefik.docker.network=proxy"
+      
+      # Enable automatic updates with Watchtower
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+  postgresql-primary-backend:
+    external: true
